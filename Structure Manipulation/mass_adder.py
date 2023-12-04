@@ -24,7 +24,7 @@ add_base=sys.argv[4]
 input_targets=[int(x) for x in sys.argv[5:]]
 
 bond_max=3.0 #an arbitrary parameter for determining the upper distance between two atoms for them to be considered bonded
-bond_lengths={"In":{"F":2.02,"Cl":2.37},"Ga":{"F":1.79,"Cl":2.19},"P":{"O":1.53}} #hard coded (terminal) bond lengths. not everything will be supported. Don't have to be perfect, these are just pre-opt estimates
+bond_lengths={"In":{"F":2.02,"Cl":2.37,"P":2.6},"Ga":{"F":1.79,"Cl":2.19,"P":2.48},"P":{"O":1.53}} #hard coded (terminal) bond lengths. not everything will be supported. Don't have to be perfect, these are just pre-opt estimates
 
 coords,atoms=read_xyz(xyz)
 temp_coords=np.copy(coords)
@@ -45,6 +45,12 @@ for i,target in enumerate(targets):
 	bond_length=bond_lengths[temp_atoms[target]][add]
 	dists=dist_all_points(temp_coords)
 	connectivity=connectivity_finder(dists,bond_max)
+
+	#compute center of dot (no mass)
+	center=np.array([0,0,0])
+	for i,atom in enumerate(temp_atoms):
+		center=center+temp_coords[i]
+	center=center/len(temp_atoms)
 
 	if len(connectivity[target])==1:
 		anchor=connectivity[target][0]
@@ -76,26 +82,51 @@ for i,target in enumerate(targets):
 	elif len(connectivity[target])==4:
 			#I think the best way to do this is to split the biggest gap, actually
 			#but it has to be angle based
-			max_angle=0 #arbitrary large number
+			#but i need some way to avoid adding internal ligand
+
+			# max_angle=0 #arbitrary large number
+			angles=[]
 			for j,bond1 in enumerate(connectivity[target]):
 				for k,bond2 in enumerate(connectivity[target]):
-					if j!=k:
-						dist1 = dists[bond1][bond2]
-						dist2 = dists[bond1][target]
-						dist3 = dists[bond2][target]
-						num = dist1**2 + dist2**2 - dist3**2
-						denom = 2*dist1*dist2
+					if j>k:
+						
+						v1=temp_coords[bond1]-temp_coords[target]
+						v2=temp_coords[bond2]-temp_coords[target]
+
+						num=np.dot(v1,v2)
+						denom=dists[bond1][target]*dists[bond2][target]
+
 						angle = math.acos(num/denom)
-						if angle>max_angle:
-							max_angle=angle
-							max_index_1=bond1
-							max_index_2=bond2
+						angles.append([angle,bond1,bond2])
+						# if angle>max_angle:
+						# 	max_angle=angle
+						# 	max_index_1=bond1
+						# 	max_index_2=bond2
 
-			v1=temp_coords[max_index_1]-temp_coords[target]
-			v2=temp_coords[max_index_2]-temp_coords[target]
+			angles.sort(key = lambda x: x[0], reverse=True)
 
-			vector=v1+v2
-			unit=vector/np.linalg.norm(vector)
+			success=False
+			i=0
+			while not success:
+
+				v1=temp_coords[angles[i][1]]-temp_coords[target]
+				v2=temp_coords[angles[i][2]]-temp_coords[target]
+
+				#I need to implement some sort of test that makes sure the additions to 4c point "outward"
+				vector=v1+v2
+				unit=vector/np.linalg.norm(vector)
+
+				test_vector=temp_coords[target]-center
+				dot=np.dot(unit,test_vector)
+
+				if dot>0:
+					success=True
+
+				else:
+					i=i+1
+
+
+
 
 			added_coords=temp_coords[target]+(unit*bond_length)
 			temp_coords=np.append(temp_coords,[added_coords],axis=0)
