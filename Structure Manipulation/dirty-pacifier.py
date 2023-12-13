@@ -8,6 +8,7 @@ import random
 
 #the brute's way of passivating a QD from a negative charge to neutral
 #goes through and removes a certain number of -1 halogen ligands from 4c surface cations
+#i have updated this to avoid the creation of strong dipole moments
 
 xyz=sys.argv[1] #the original dot. In, P, Ga, Al, F, Cl supported
 out=sys.argv[2] #name of .xyz to write
@@ -19,7 +20,7 @@ nncutoff=3 #We want to avoid making any In-2c
 coords,atoms = read_input_xyz(xyz)
 
 n_pop=0
-while n_pop <charge:	
+while n_pop < charge:	
 
 	#ind_p = np.logical_or(atoms=='P',np.logical_or(atoms=="Se",atoms=="S"))
 	ind_p = np.logical_or(np.logical_or(atoms=='P',np.logical_or(atoms=="Se",atoms=="S")),np.logical_or(atoms=="C",atoms=="Si")) #temporary for P to C/Si defects
@@ -38,13 +39,37 @@ while n_pop <charge:
 
 	target=random.randint(1,n_lig)
 
+	count=0
+	for i,atom in enumerate(atoms):
+		if ind_lig[i]:
+			count=count+1
+			if count==target:
+				target_total_index=i
+
+
+	#add a second target that is maximal distance from the first target
+	if (charge-n_pop)>1:
+		dists=dist_all_points(coords)
+		connectivity=connectivity_finder(dists,cutoff)
+		max_dist=0
+		count=0
+		for i,atom in enumerate(atoms):
+			if ind_lig[i]:
+				count=count+1
+				if dists[i][target_total_index]>max_dist:
+					anchor_i=connectivity[i][0]
+					if len(connectivity[anchor_i])>3:
+						second_target=count
+						max_dist=dists[i][target_total_index]
+	print(target, second_target)
+
 	new_coords=[]
 	new_atoms=[]
 	lig_count=0
 	for j,atom in enumerate(atoms):
 		if ind_lig[j]:
 			lig_count=lig_count+1
-			if lig_count==target:
+			if lig_count==target or lig_count==second_target:
 				pass
 			else:
 				new_coords.append(coords[j])
@@ -69,7 +94,10 @@ while n_pop <charge:
 	if new_n_underc_cat==n_underc_cat:
 		coords=new_coords
 		atoms=new_atoms
-		n_pop=n_pop+1
+		if (charge-n_pop)>1:
+			n_pop=n_pop+2
+		else:
+			n_pop=n_pop+1
 		print("Removed", n_pop, "ligands")
 
 
