@@ -23,8 +23,8 @@ add_base=sys.argv[4]
 #the following inputs are any number of atom-specific
 input_targets=[int(x) for x in sys.argv[5:]]
 
-bond_max=3.0 #an arbitrary parameter for determining the upper distance between two atoms for them to be considered bonded
-bond_lengths={"In":{"F":2.02,"Cl":2.37,"P":2.6},"Ga":{"F":1.79,"Cl":2.19,"P":2.48},"P":{"O":1.53}} #hard coded (terminal) bond lengths. not everything will be supported. Don't have to be perfect, these are just pre-opt estimates
+bond_max=3.43 #an arbitrary parameter for determining the upper distance between two atoms for them to be considered bonded
+bond_lengths={"In":{"F":2.02,"Cl":2.37,"P":2.6},"Ga":{"F":1.79,"Cl":2.19,"P":2.48},"P":{"O":1.53,"Ga":2.5}} #hard coded (terminal) bond lengths. not everything will be supported. Don't have to be perfect, these are just pre-opt estimates
 
 coords,atoms=read_xyz(xyz)
 temp_coords=np.copy(coords)
@@ -57,6 +57,16 @@ for i,target in enumerate(targets):
 		anchor_bonds=connectivity[anchor]
 		vector=temp_coords[anchor]-temp_coords[anchor_bonds[0]]
 		unit=vector/np.linalg.norm(vector)
+
+		test_vector=temp_coords[target]-center
+		dot=np.dot(unit,test_vector)
+		i=0
+		while dot<0:
+			i=i+1
+			vector=temp_coords[anchor]-temp_coords[anchor_bonds[i]]
+			unit=vector/np.linalg.norm(vector)
+			dot=np.dot(unit,test_vector)
+
 		added_coords=temp_coords[target]+(unit*bond_length)
 		temp_coords=np.append(temp_coords,[added_coords],axis=0)
 		temp_atoms=np.append(temp_atoms,add)
@@ -73,6 +83,10 @@ for i,target in enumerate(targets):
 		opposite=bond_length*math.sin(math.radians(109.5/2))
 
 		added_coords=temp_coords[target]+(parallel*adjacent)+(perp_unit*opposite)
+
+		if np.linalg.norm(added_coords-center)<np.linalg.norm(temp_coords[target]-center):
+			added_coords=temp_coords[target]+(parallel*adjacent)-(perp_unit*opposite)
+
 		temp_coords=np.append(temp_coords,[added_coords],axis=0)
 		temp_atoms=np.append(temp_atoms,add)
 
@@ -97,11 +111,30 @@ for i,target in enumerate(targets):
 						denom=dists[bond1][target]*dists[bond2][target]
 
 						angle = math.acos(num/denom)
-						angles.append([angle,bond1,bond2])
+						weight=(dists[bond1][target]+dists[bond2][target])/2
+						angles.append([angle*weight,bond1,bond2])
 						# if angle>max_angle:
 						# 	max_angle=angle
 						# 	max_index_1=bond1
 						# 	max_index_2=bond2
+
+			#let's also consider dummy 4-atom angles
+			for j,bond1 in enumerate(connectivity[target]):
+				for k,bond2 in enumerate(connectivity[target]):
+					for l,bond3 in enumerate(connectivity[target]):
+						if j>k and k>l:
+
+							dummy_coords=(temp_coords[bond1]+temp_coords[bond2])/2
+							v1=temp_coords[bond3]-temp_coords[target]
+							v2=dummy_coords-temp_coords[target]
+
+							num=np.dot(v1,v2)
+							denom=np.linalg.norm(v1)*np.linalg.norm(v2)
+
+							angle = math.acos(num/denom)
+							weight=(np.linalg.norm(v1)+dists[bond1][target]+dists[bond2][target])/3
+							angles.append([angle*weight,bond3,[bond1,bond2]])
+
 
 			angles.sort(key = lambda x: x[0], reverse=True)
 
@@ -110,7 +143,11 @@ for i,target in enumerate(targets):
 			while not success:
 
 				v1=temp_coords[angles[i][1]]-temp_coords[target]
-				v2=temp_coords[angles[i][2]]-temp_coords[target]
+				if isinstance(angles[i][2],int):
+					v2=temp_coords[angles[i][2]]-temp_coords[target]
+				else:
+					dummy_coords=(temp_coords[angles[i][2][0]]+temp_coords[angles[i][2][1]])/2
+					v2=dummy_coords-temp_coords[target]
 
 				#I need to implement some sort of test that makes sure the additions to 4c point "outward"
 				vector=v1+v2
