@@ -8,6 +8,6 @@ outpt = sys.argv[1]
 
 xyz_name=outpt[:-4]+".xyz"
 
-atoms, coords = get_converged_geom(outpt)
+coords,atoms = get_converged_geom(outpt)
 
 write_xyz(xyz_name, atoms, coords)
