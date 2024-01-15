@@ -6,6 +6,54 @@ import math
 import numpy as np
 from matplotlib import pyplot as plt
 
+def get_geom_cp2k(xyz):
+    '''
+    Gets the last (converged) .xyz from a c2pk CP2K-pos-1.xyz
+
+    Inputs:
+        xyz: String. The name of the cp2k .xyz file
+    Outputs:
+        atoms: np array of atom names, in order. NAtoms long
+        coords: np array of (x,y,z) coordinated in angstroms. NAtoms x 3
+    '''
+
+    f = open(xyz, "r")
+    lines=f.readlines()
+    n_atoms=int(lines[0].strip())
+    n_iterations=len(lines)/(n_atoms+2)
+    start_line=int(((n_atoms+2)*(n_iterations-1))+2) #0-indexed
+
+    xyz_coords = np.loadtxt(xyz,skiprows=start_line,usecols=(1,2,3))
+    atom_names = np.loadtxt(xyz,skiprows=start_line,usecols=(0,),dtype=str)
+    return xyz_coords, atom_names
+
+
+def smart_connectivity_finder(dists,atoms):
+    '''
+    Like the original connectivity finder, but uses a dictionary to implement atom-specific bond thresholds
+
+    makes an NAtoms list containing, for each atom, the indices of all other atoms within cutoff of that atom
+
+    Inputs:
+        dists: np array with distances between all atoms, size (Natoms, Natoms)
+    Outputs:
+        connect: NAtom alist of NBonded lists of python-adjusted indices for all other atoms within cutoff of that atom
+    '''
+
+    covalent_radii={"In":1.42,"Ga":1.22,"P":1.07,"Cl":1.02,"F":0.57,"Zn":1.22,"S":1.05,"Se":1.20,"O":0.66,"Al":1.21,"H":0.31}
+    #bond_maxes={"In":{"F":2.49,"Cl":3.05,"P":3.11,"S":3.09,"Se":3.28},"Ga":{"F":2.24,"Cl":2.80,"P":2.86,"S":2.84,"Se":3.02},"P":{"O":2.16,"In":3.11,"Ga":2.86,"Zn":2.86},"F":{"In":2.49,"Ga":2.24,"Zn":2.24},"Cl":{"In":3.05,"Ga":2.80,"Zn":2.80},"O":{"P":2.16},"Zn":{"P":2.86,"F":2.24,"Cl":2.80,"S":2.84,"Se":3.02},"S":{"In":3.09,"Ga":2.84,"Zn":2.84},"Se":{"In":3.09,"Ga":3.02,"Zn":3.02}}
+
+    connectivity=[]
+    for i,atom in enumerate(dists):
+        bonds=[]
+        for j,dist in enumerate(atom):
+            cutoff=(covalent_radii[atoms[i]]+covalent_radii[atoms[j]])*1.25
+            if float(dist) < cutoff and i!=j:
+                bonds.append(j)
+        connectivity.append(bonds)
+
+    return connectivity
+
 def get_coordination_sphere(center,radius,npoints):
     '''
     Meant to generate a numpy array of xyz coordinates that lie along a given sphere
@@ -250,13 +298,21 @@ def get_label(atoms,coords,target_element,target_index,threshold,ligand):
     for i,atom in enumerate(atoms):
         if atom==target_element:
             count=count+1
-            if count==target_index:
-                if len(connectivity[i])<4:
+            if count==target_index: #find your element
+
+                if len(connectivity[i])<4: #test under-coordinated P
                     for j,bond in enumerate(connectivity[i]):
                         if len(connectivity[bond])<4 and atoms[bond]!=ligand:
                             return "Bound to Trap"
                     return "Under-Coordinated"
                 else:
+                    #I want to add a function to make "near a trap but not bound to it" into "Bound to Trap"
+                    # for j,dist in enumerate(dists[i]):
+                    #     if dist<5 and (atoms[j]=="In" or atoms[j]=="Ga" or atoms[j]=="Al"): #arbitrary
+                    #         if len(connectivity[j])<4:
+                    #             #print(atoms[j],to_atom_specific_index(atoms,j))
+                    #             uc_flag=True
+
                     for j,bond in enumerate(connectivity[i]):
                         if len(connectivity[bond])<4 and atoms[bond]!=ligand:
                             uc_flag=True
