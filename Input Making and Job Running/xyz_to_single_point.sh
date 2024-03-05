@@ -9,7 +9,7 @@
 # Also automatically 0-centers your coordinates just for funsies
 
 # Assumptions:  State in question is a singlet
-#				That the joint plot/ipr job's scratch will save the way I want it to
+#				That the joint plot/ipr job's scratch will save the way I want it to (it does)
 #				That we will be using PBE0/def2-SVP
 #				Everything is in its most common oxidation state (+1 for H)
 #				.xyz file name is of the form optzd_DESCRIPTOR.xyz
@@ -23,8 +23,8 @@ cores=$2 #the number of cores you want the calculation to run on
 plot_min=$3 #the lowest energy MO you want to plot. 0 for HOMO, 1 for HOMO-1, etc
 plot_max=$4 #the highest energy MO you want to plot. 0 for LUMO, 1 for LUMO+1, etc
 mode=$5 #just a plot ("plot"), just an ipr ("ipr"), or the ipr+plot ("both")
-mem_static=$6 #the mem_static value in qchem's $rem
-priority=$7 #the priority for the job. If on Ulysses, leave blank
+mem_static=$6 #the mem_static value in qchem's $rem, in MB
+priority=$7 #the priority for the job. If on Ulysses, use 'ulysses'. priotity automatically sets mem_total
 
 python3 ~/code/xyz_to_single_point.py $xyz $cores $plot_min $plot_max $mode $mem_static $priority
 

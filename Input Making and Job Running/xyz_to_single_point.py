@@ -11,12 +11,12 @@ cores=sys.argv[2]#the number of cores you want the calculation to run on
 plot_min=int(sys.argv[3]) #the lowest energy MO you want to plot. 0 for HOMO, 1 for HOMO-1, etc
 plot_max=int(sys.argv[4]) #the highest energy MO you want to plot. 0 for LUMO, 1 for LUMO+1, etc
 mode=sys.argv[5] #just a plot ("plot") or the ipr+plot ("both")
-mem_static=sys.argv[6] #the mem_static value in qchem's $rem
+mem_static=sys.argv[6] #the mem_static value in qchem's $rem, in MB
+priority=sys.argv[7] #the priority for the job. If on Ulysses, say 'ulysses'. priotity automatically sets mem_total
 
-telemachus=False
-if len(sys.argv)>7:
-	priority=sys.argv[7] #the priority for the job. If on Ulysses, leave blank
-	telemachus=True
+telemachus=True
+if priority=='ulysses':
+	telemachus=False
 
 #disctionaries with built-in info
 atomic_charges= {"In":3, "Ga":3, "P":-3, "F":-1, "Cl":-1, "Al":3,"Zn":2,"Se":-1,"S":-2,"O":-2,"H":1} #manual dictionary of the preferred oxidation state of each atom
